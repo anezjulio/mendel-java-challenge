@@ -22,15 +22,13 @@ public class TransactionController {
     }
 
     @PutMapping("/{transactionId}")
-    public StatusResponseDTO upsert(
-            @PathVariable long transactionId,
-            @RequestBody @Valid TransactionUpsertRequestDTO request
-    ) {
+    public StatusResponseDTO upsert(@PathVariable long transactionId,
+                                 @RequestBody @Valid TransactionUpsertRequestDTO request) {
         service.upsert(transactionId, request);
         return new StatusResponseDTO("ok");
     }
 
-    // Este GET no está en el enunciado, pero se usara para probar rápido mientras tanto.
+    // Este GET no está en el enunciado del challange, pero lo dejare para pruebas.
     @GetMapping("/{transactionId}")
     public TransactionResponseDTO getById(@PathVariable long transactionId) {
         Transaction tx = service.getById(transactionId);

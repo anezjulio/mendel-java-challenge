@@ -28,13 +28,8 @@ class TransactionIntegrationTest {
 
     @BeforeEach
     void seedExampleData() {
-        // PUT /transactions/10 { amount:5000, type:"cars" }
         putTransaction(10, new TransactionUpsertRequestDTO(5000.0, "cars", null));
-
-        // PUT /transactions/11 { amount:10000, type:"shopping", parent_id:10 }
         putTransaction(11, new TransactionUpsertRequestDTO(10000.0, "shopping", 10L));
-
-        // PUT /transactions/12 { amount:5000, type:"shopping", parent_id:11 }
         putTransaction(12, new TransactionUpsertRequestDTO(5000.0, "shopping", 11L));
     }
 
@@ -70,7 +65,6 @@ class TransactionIntegrationTest {
 
     @Test
     void shouldReturn400_whenTypeIsBlank() {
-        // type = "" (blank) => 400
         ResponseEntity<String> response = putRaw(20,
                 """
                 { "amount": 10.0, "type": "" }
@@ -83,7 +77,6 @@ class TransactionIntegrationTest {
 
     @Test
     void shouldReturn400_whenAmountIsMissing() {
-        // amount missing => 400
         ResponseEntity<String> response = putRaw(21,
                 """
                 { "type": "cars" }
@@ -105,7 +98,6 @@ class TransactionIntegrationTest {
 
     @Test
     void shouldReturn400_whenParentDoesNotExist() {
-        // parent_id apunta a transacción que no existe => 400 (o 404, pero definilo)
         ResponseEntity<String> response = putRaw(30,
                 """
                 { "amount": 1.0, "type": "x", "parent_id": 999999 }
