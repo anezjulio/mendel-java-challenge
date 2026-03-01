@@ -56,7 +56,7 @@ class TransactionIntegrationTest {
     @Test
     void shouldReturnSumForTransaction11() {
         ResponseEntity<SumResponseDTO> response =
-                restTemplate.getForEntity(baseUrl("/transactions/sum/11") , SumResponseDTO.class);
+                restTemplate.getForEntity(baseUrl("/transactions/sum/11"), SumResponseDTO.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -104,18 +104,71 @@ class TransactionIntegrationTest {
                 """
         );
 
-        // Yo recomiendo 400 (bad request) porque el request es inválido
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
     }
 
     @Test
     void shouldRejectCycles_whenUpdatingParentToDescendant() {
-        // Caso borde: ya existe 10 -> 11 -> 12
-        // Intento: actualizar 10 para que su parent sea 12 (crea ciclo 10 -> 11 -> 12 -> 10)
         ResponseEntity<String> response = putRaw(10,
                 """
                 { "amount": 5000.0, "type": "cars", "parent_id": 12 }
+                """
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+    }
+
+    @Test
+    void updateShouldMoveTransactionBetweenTypes() {
+        putTransaction(100, new TransactionUpsertRequestDTO(10.0, "cars", null));
+        putTransaction(101, new TransactionUpsertRequestDTO(20.0, "cars", null));
+
+        // update 101: cars -> shopping
+        putTransaction(101, new TransactionUpsertRequestDTO(20.0, "shopping", null));
+
+        ResponseEntity<Long[]> carsResponse =
+                restTemplate.getForEntity(baseUrl("/transactions/types/cars"), Long[].class);
+
+        ResponseEntity<Long[]> shoppingResponse =
+                restTemplate.getForEntity(baseUrl("/transactions/types/shopping"), Long[].class);
+
+        assertThat(carsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(shoppingResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        assertThat(carsResponse.getBody()).isNotNull();
+        assertThat(shoppingResponse.getBody()).isNotNull();
+
+        // cars debe contener 10 y 100 (y NO 101 porque se movió a shopping)
+        assertThat(Arrays.asList(carsResponse.getBody())).contains(10L, 100L);
+        assertThat(Arrays.asList(carsResponse.getBody())).doesNotContain(101L);
+
+        // shopping ya contiene 11 y 12 por el @BeforeEach, y ahora también debe contener 101
+        assertThat(Arrays.asList(shoppingResponse.getBody())).contains(11L, 12L, 101L);
+        assertThat(Arrays.asList(shoppingResponse.getBody())).doesNotContain(100L);
+    }
+
+    @Test
+    void sumShouldWorkWithTwoChildrenTree() {
+        putTransaction(200, new TransactionUpsertRequestDTO(5.0, "cars", null));
+        putTransaction(201, new TransactionUpsertRequestDTO(7.0, "shopping", 200L));
+        putTransaction(202, new TransactionUpsertRequestDTO(9.0, "shopping", 200L));
+
+        ResponseEntity<SumResponseDTO> response =
+                restTemplate.getForEntity(baseUrl("/transactions/sum/200"), SumResponseDTO.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().sum()).isEqualTo(21.0);
+    }
+
+    @Test
+    void invalidJsonShouldReturn400() {
+        // amount como string => Jackson parse error
+        ResponseEntity<String> response = putRaw(300,
+                """
+                { "amount": "abc", "type": "cars" }
                 """
         );
 
