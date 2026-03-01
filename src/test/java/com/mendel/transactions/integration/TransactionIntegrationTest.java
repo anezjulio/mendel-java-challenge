@@ -22,8 +22,8 @@ class TransactionIntegrationTest {
 
     private final TestRestTemplate restTemplate = new TestRestTemplate();
 
-    private String baseUrl() {
-        return "http://localhost:" + port;
+    private String baseUrl(String path) {
+        return "http://localhost:" + port + path;
     }
 
     @BeforeEach
@@ -41,7 +41,7 @@ class TransactionIntegrationTest {
     @Test
     void shouldReturnIdsByType() {
         ResponseEntity<Long[]> response =
-                restTemplate.getForEntity(baseUrl() + "/transactions/types/cars", Long[].class);
+                restTemplate.getForEntity(baseUrl("/transactions/types/cars"), Long[].class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -51,7 +51,7 @@ class TransactionIntegrationTest {
     @Test
     void shouldReturnSumForTransaction10() {
         ResponseEntity<SumResponseDTO> response =
-                restTemplate.getForEntity(baseUrl() + "/transactions/sum/10", SumResponseDTO.class);
+                restTemplate.getForEntity(baseUrl("/transactions/sum/10"), SumResponseDTO.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -61,11 +61,87 @@ class TransactionIntegrationTest {
     @Test
     void shouldReturnSumForTransaction11() {
         ResponseEntity<SumResponseDTO> response =
-                restTemplate.getForEntity(baseUrl() + "/transactions/sum/11", SumResponseDTO.class);
+                restTemplate.getForEntity(baseUrl("/transactions/sum/11") , SumResponseDTO.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().sum()).isEqualTo(15000.0);
+    }
+
+    @Test
+    void shouldReturn400_whenTypeIsBlank() {
+        // type = "" (blank) => 400
+        ResponseEntity<String> response = putRaw(20,
+                """
+                { "amount": 10.0, "type": "" }
+                """
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+    }
+
+    @Test
+    void shouldReturn400_whenAmountIsMissing() {
+        // amount missing => 400
+        ResponseEntity<String> response = putRaw(21,
+                """
+                { "type": "cars" }
+                """
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+    }
+
+    @Test
+    void shouldReturn404_whenGettingSumForUnknownTransaction() {
+        ResponseEntity<String> response =
+                restTemplate.getForEntity(baseUrl("/transactions/sum/999999"), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+    }
+
+    @Test
+    void shouldReturn400_whenParentDoesNotExist() {
+        // parent_id apunta a transacción que no existe => 400 (o 404, pero definilo)
+        ResponseEntity<String> response = putRaw(30,
+                """
+                { "amount": 1.0, "type": "x", "parent_id": 999999 }
+                """
+        );
+
+        // Yo recomiendo 400 (bad request) porque el request es inválido
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+    }
+
+    @Test
+    void shouldRejectCycles_whenUpdatingParentToDescendant() {
+        // Caso borde: ya existe 10 -> 11 -> 12
+        // Intento: actualizar 10 para que su parent sea 12 (crea ciclo 10 -> 11 -> 12 -> 10)
+        ResponseEntity<String> response = putRaw(10,
+                """
+                { "amount": 5000.0, "type": "cars", "parent_id": 12 }
+                """
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+    }
+
+    private ResponseEntity<String> putRaw(long id, String jsonBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+
+        return restTemplate.exchange(
+                baseUrl("/transactions/" + id),
+                HttpMethod.PUT,
+                entity,
+                String.class
+        );
     }
 
     private void putTransaction(long id, TransactionUpsertRequestDTO request) {
@@ -75,7 +151,7 @@ class TransactionIntegrationTest {
         HttpEntity<TransactionUpsertRequestDTO> entity = new HttpEntity<>(request, headers);
 
         ResponseEntity<StatusResponseDTO> response = restTemplate.exchange(
-                baseUrl() + "/transactions/" + id,
+                baseUrl("/transactions/" + id),
                 HttpMethod.PUT,
                 entity,
                 StatusResponseDTO.class

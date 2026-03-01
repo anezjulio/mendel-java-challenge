@@ -1,6 +1,7 @@
 package com.mendel.transactions.api.controller;
 
 import com.mendel.transactions.api.dto.StatusResponseDTO;
+import com.mendel.transactions.api.dto.SumResponseDTO;
 import com.mendel.transactions.api.dto.TransactionResponseDTO;
 import com.mendel.transactions.api.dto.TransactionUpsertRequestDTO;
 import com.mendel.transactions.application.service.TransactionService;
@@ -39,6 +40,11 @@ public class TransactionController {
     @GetMapping("/types/{type}")
     public List<Long> getByType(@PathVariable String type) {
         return service.getIdsByType(type).stream().sorted().toList();
+    }
+
+    @GetMapping("/sum/{transactionId}")
+    public SumResponseDTO sum(@PathVariable long transactionId) {
+        return new SumResponseDTO(service.sum(transactionId));
     }
 
 }

@@ -9,4 +9,5 @@ public interface TransactionRepository {
     Optional<Transaction> findById(long id);
     void upsert(Transaction transaction);
     Set<Long> findIdsByType(String type);
+    Set<Long> findChildrenIds(long parentId);
 }
