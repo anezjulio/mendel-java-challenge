@@ -8,10 +8,12 @@ import com.mendel.transactions.domain.model.Transaction;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/transactions")
 public class TransactionController {
-    
+
     private final TransactionService service;
 
     public TransactionController(TransactionService service) {
@@ -32,6 +34,11 @@ public class TransactionController {
     public TransactionResponseDTO getById(@PathVariable long transactionId) {
         Transaction tx = service.getById(transactionId);
         return new TransactionResponseDTO(tx.id(), tx.amount(), tx.type(), tx.parentId());
+    }
+
+    @GetMapping("/types/{type}")
+    public List<Long> getByType(@PathVariable String type) {
+        return service.getIdsByType(type).stream().sorted().toList();
     }
 
 }

@@ -5,6 +5,8 @@ import com.mendel.transactions.application.port.TransactionRepository;
 import com.mendel.transactions.domain.model.Transaction;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
+
 @Service
 public class TransactionService {
 
@@ -23,5 +25,9 @@ public class TransactionService {
     public Transaction getById(long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + id));
+    }
+
+    public Set<Long> getIdsByType(String type) {
+        return repository.findIdsByType(type);
     }
 }
