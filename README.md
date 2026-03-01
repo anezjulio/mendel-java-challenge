@@ -1,2 +1,2 @@
 # mendel-java-challenge
-prueba de Mendel java
+prueba para Mendel java
