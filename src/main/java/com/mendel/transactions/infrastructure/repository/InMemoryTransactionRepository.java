@@ -4,61 +4,67 @@ import com.mendel.transactions.application.port.TransactionRepository;
 import com.mendel.transactions.domain.model.Transaction;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.*;
 
 @Repository
 public class InMemoryTransactionRepository implements TransactionRepository {
-
-    private final ConcurrentHashMap<Long, Transaction> byId = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Set<Long>> idsByType = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, Set<Long>> childrenByParent = new ConcurrentHashMap<>();
-
+    private final Map<Long, Transaction> byId = new HashMap<>();
+    private final Map<String, Set<Long>> idsByType = new HashMap<>();
+    private final Map<Long, Set<Long>> childrenByParent = new HashMap<>();
 
     @Override
-    public Optional<Transaction> findById(long id) {
+    public synchronized Optional<Transaction> findById(long id) {
         return Optional.ofNullable(byId.get(id));
     }
 
     @Override
-    public void upsert(Transaction tx) {
+    public synchronized void upsert(Transaction tx) {
+
         Transaction previous = byId.put(tx.id(), tx);
 
-        // limpiar índices si era update
+        // Cleanup si es update
         if (previous != null) {
-            // type index
+            // limpiar índice de type
             Set<Long> oldTypeSet = idsByType.get(previous.type());
-            if (oldTypeSet != null) oldTypeSet.remove(previous.id());
+            if (oldTypeSet != null) {
+                oldTypeSet.remove(previous.id());
+                if (oldTypeSet.isEmpty()) {
+                    idsByType.remove(previous.type());
+                }
+            }
 
-            // parent->children index
+            // limpiar índice parent->children
             if (previous.parentId() != null) {
                 Set<Long> oldChildren = childrenByParent.get(previous.parentId());
-                if (oldChildren != null) oldChildren.remove(previous.id());
+                if (oldChildren != null) {
+                    oldChildren.remove(previous.id());
+                    if (oldChildren.isEmpty()) {
+                        childrenByParent.remove(previous.parentId());
+                    }
+                }
             }
         }
 
-        //  agregar a type index
-        idsByType.computeIfAbsent(tx.type(), k -> ConcurrentHashMap.newKeySet())
+        // agregar al índice por type
+        idsByType
+                .computeIfAbsent(tx.type(), k -> new HashSet<>())
                 .add(tx.id());
 
-        //  agregar a parent->children index
+        // agregar al índice parent->children
         if (tx.parentId() != null) {
             childrenByParent
-                    .computeIfAbsent(tx.parentId(), k -> ConcurrentHashMap.newKeySet())
+                    .computeIfAbsent(tx.parentId(), k -> new HashSet<>())
                     .add(tx.id());
         }
     }
 
     @Override
-    public Set<Long> findIdsByType(String type) {
-        return idsByType.getOrDefault(type, Collections.emptySet());
+    public synchronized Set<Long> findIdsByType(String type) {
+        return new HashSet<>(idsByType.getOrDefault(type, Set.of()));
     }
 
     @Override
-    public Set<Long> findChildrenIds(long parentId) {
-        return childrenByParent.getOrDefault(parentId, Collections.emptySet());
+    public synchronized Set<Long> findChildrenIds(long parentId) {
+        return new HashSet<>(childrenByParent.getOrDefault(parentId, Set.of()));
     }
-
 }

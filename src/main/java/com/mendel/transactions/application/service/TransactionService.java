@@ -30,7 +30,7 @@ public class TransactionService {
             }
 
             // no puede ser su propio padre
-            if (parentId == id) {
+            if (parentId.longValue() == id){
                 throw new BadRequestException("Transaction cannot be its own parent: " + id);
             }
 
@@ -54,10 +54,6 @@ public class TransactionService {
     }
 
     public double sum(long transactionId) {
-        // debe existir
-        repository.findById(transactionId)
-                .orElseThrow(() -> new NotFoundException("Transaction not found: " + transactionId));
-
         double total = 0.0;
         var stack = new ArrayDeque<Long>();
         var visited = new HashSet<Long>();
@@ -93,7 +89,7 @@ public class TransactionService {
             if (!visited.add(current)) continue;
 
             for (Long child : repository.findChildrenIds(current)) {
-                if (child == candidateDescendantId) return true;
+                if (child != null && child.longValue() == candidateDescendantId) return true;
                 stack.push(child);
             }
         }
