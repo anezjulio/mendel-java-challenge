@@ -5,6 +5,8 @@ import com.mendel.transactions.api.exception.BadRequestException;
 import com.mendel.transactions.api.exception.NotFoundException;
 import com.mendel.transactions.application.port.TransactionRepository;
 import com.mendel.transactions.domain.model.Transaction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayDeque;
@@ -15,6 +17,7 @@ import java.util.Set;
 public class TransactionService {
 
     private final TransactionRepository repository;
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
 
     public TransactionService(TransactionRepository repository) {
         this.repository = repository;
@@ -22,26 +25,33 @@ public class TransactionService {
 
     public void upsert(long id, TransactionUpsertRequestDTO request) {
         Long parentId = request.parentId();
+        log.info("Upsert request. id={} type={} amount={} parentId={}",
+                id, request.type(), request.amount(), parentId);
 
         if (parentId != null) {
             // parent debe existir
             if (repository.findById(parentId).isEmpty()) {
+                log.warn("Rejecting upsert. id={} parentId={} reason=parent_not_found", id, parentId);
                 throw new BadRequestException("Parent transaction not found: " + parentId);
             }
 
             // no puede ser su propio padre
             if (parentId.longValue() == id){
+                log.warn("Rejecting upsert. id={} parentId={} reason=self_parent", id, parentId);
                 throw new BadRequestException("Transaction cannot be its own parent: " + id);
             }
 
             // prevenir ciclo: parentId no puede ser un descendiente de id
             if (isDescendant(id, parentId)) {
+                log.warn("Rejecting upsert. id={} parentId={} reason=cycle_detected", id, parentId);
                 throw new BadRequestException("Cycle detected: cannot set parent_id " + parentId + " for transaction " + id);
             }
         }
 
         Transaction tx = new Transaction(id, request.amount(), request.type(), parentId);
         repository.upsert(tx);
+        log.info("Upserted transaction. id={} type={} amount={} parentId={}",
+                id, request.type(), request.amount(), parentId);
     }
 
     public Transaction getById(long id) {

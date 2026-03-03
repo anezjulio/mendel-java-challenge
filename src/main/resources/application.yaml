@@ -1,3 +1,15 @@
 spring:
   application:
     name: transactions-api
+
+logging:
+  level:
+    root: INFO
+    com.mendel.transactions: INFO
+
+  file:
+    name: logs/transactions.log
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %level - %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} - %level - %logger{36} - %msg%n"
